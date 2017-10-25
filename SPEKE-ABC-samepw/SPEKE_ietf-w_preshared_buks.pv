@@ -1,0 +1,184 @@
+(*
+ * Modeller: Roberto Metere, Feb-Apr 2017
+ * Modeled from: IETF I-D
+ *   Jablon, D "The SPEKE Password-Based Key Agreement Methods"
+ *   IETF Internet Draft
+ * 
+ * === SPEKE protocol - W-SPEKE variant ===
+ * The protocol originally computes the common group generator from a
+ * pre-shared secret. Here, we (need to) assume that the generator is secret
+ * in whatever way it is generated.
+ *)
+set attacker = active.
+set ignoreTypes = true.
+
+free c: channel.
+
+type host.
+type session.
+type key.
+type exponent.
+type group.
+
+(* Honest parties *)
+const A, B, C, D: host.
+
+(* Table of pre-shared passwords *)
+table passwords(host, host, group).
+
+(*
+ * Diffie-Hellman
+ * The group is a cyclic group in the exponents
+ *)
+const pwAB : group [private].
+fun exp(group, exponent): group.
+equation forall x: exponent, y: exponent; exp(exp(pwAB , x), y) = exp(exp(pwAB , y), x).
+
+(* The participants may want to use the shared key for simmetric encryption *)
+type plaintext.
+type ciphertext.
+fun enc(key, plaintext): ciphertext.
+reduc forall k: key, p: plaintext; dec(k, enc(k, p)) = p.
+free message: plaintext [private].
+let processUseSessionKey(k: key) = out(c, enc(k, message)).
+
+(*
+ * Declare additional (empty) processes.
+ * Depending on the property to check, they will be overwritten
+ * with non-empty process.
+ *)
+let processAgreement = 0.
+let processDisclosePasswords = 0.
+
+(* Pre-shared passwords *)
+let processSetPasswords(g: group) =
+  insert passwords(A, B, g);
+  insert passwords(B, A, g);
+  
+  (*
+   * In the case A shares the same password with multiple entities.
+   * We remark that such a situation is degenerative and a mistake
+   * made by the user; so any fallacy entiled by such behaviour
+   * is not strictly imputable to the protocol design.
+   *
+   * WARNING: impersonation property check overwrites this process.
+   *)
+  insert passwords(A, C, g);
+  insert passwords(C, A, g);
+  insert passwords(B, C, g);
+  insert passwords(C, B, g);
+  
+  processDisclosePasswords.
+
+let processPasswords = processSetPasswords(pwAB).
+
+
+(* Detecting additional attacks/flaws *)
+table tableIbuks(host, host, session, key).
+table tableRbuks(host, host, session, key).
+event  endIRbuks(host, host, session, key, 
+                 host, host, session, key).
+
+(* Bilateral UKS attacks *)
+query a: host, b: host, s: session, a': host, b': host, s': session, k: key;
+  event(endIRbuks(a, b, s, k, a', b', s, k)) ==> a = a' && b = b'.
+
+(* Agreement *)
+let processAgreement =
+  get  tableIbuks(a , b , s , k ) in
+  get  tableRbuks(a', b', s', k') in
+  event endIRbuks(a , b , s , k , a', b', s', k').
+(* Hash function *)
+fun HASH(group): exponent.
+fun KEY(bitstring): key [typeConverter].
+fun grp2bs(group): bitstring [typeConverter].
+reduc forall h: group; bs2grp(grp2bs(h)) = h.
+
+(* KDF reduction *)
+fun KDF(host, group, host, group, session, group): key.
+equation forall a: host, X: group, b: host, Y: group, s: session, kmaterial: group; KDF(a, X, b, Y, s, kmaterial) = KEY(grp2bs(kmaterial)).
+
+(* Key Confirmation Function for last phase *)
+const three: bitstring.
+const four: bitstring.
+fun KCF(bitstring, host, host, bitstring, group): bitstring.
+
+(* This is another pre-shared secret value, like the password *)
+const r: exponent [private].
+
+(* Secret derivation *)
+fun MULTEXP(exponent, exponent): exponent.
+fun MULTGRP(group, group): group.
+
+(* Initiator I talking to responder R *)
+let processInitiator(s: session) =
+  (* This input round is only used to establish who's whom *)
+  in(c, (I: host, R: host));
+  (* A party cannot possibly know how to communicate to "unknown" parties *)
+  get passwords(=I, =R, h) in
+    new x: exponent;
+    let X = exp(h, x) in
+      out(c, (I, X)); (* first communication *)
+      in(c, (=R, Y': group));
+      let kmaterial = grp2bs(MULTGRP(exp(Y', x), exp(Y', MULTEXP(r, HASH(Y'))))) in
+        let k = KEY(kmaterial) in
+          let hhk = KCF(three, I, R, kmaterial, h) in
+            let hk = KCF(four, I, R, kmaterial, h) in
+              out(c, hhk);
+              in(c, =hk);
+insert tableIbuks(I, R, s, k);
+              (* Use the key -- out of the protocol *)
+              processUseSessionKey(k).
+
+(* Responder R talking to initiator I *)
+let processResponder(s: session) =
+  (* This input round is only used to establish who's whom *)
+  in(c, (I: host, R: host));
+  (* A party cannot possibly know how to communicate to "unknown" parties *)
+  get passwords(=R, =I, h) in
+    new y: exponent;
+    let Y = exp(h, y) in
+      out(c, (R, Y)); (* first communication *)
+      in(c, (=I, X': group));
+      let kmaterial = grp2bs(MULTGRP(exp(X', y), exp(Y, MULTEXP(r, HASH(Y))))) in
+        let k = KEY(kmaterial) in
+          let hhk = KCF(three, I, R, kmaterial, h) in
+            let hk = KCF(four, I, R, kmaterial, h) in
+              out(c, hk);
+              in(c, =hhk);
+insert tableRbuks(I, R, s, k);
+              (* Use the key -- out of the protocol *)
+              processUseSessionKey(k).
+
+
+
+(*
+ * This process captures the idea that all pre-shared password can be used in
+ * multiple sessions, but only at most one initiator and at most one responder
+ * are allowed in the same session.
+ * The symmetric nature of the protocol, if respected, will be in the two
+ * processes for the initiator and the responder, i.e. contemporary output to
+ * the channel.
+ *)
+let processSPEKE =
+  (new sid: session;
+    out(c, sid); (* the sID is explicitly not a secret *)
+    (
+        (processInitiator(sid))
+      | (processResponder(sid))
+    )
+  ).
+
+(*
+ * The idea is that at first, we setup some honest entities to
+ * share some password, otherwise the would never engage the protocol.
+ * Then we run the protocol for unbounded number of concurrent executions.
+ * Finally we record events relating to some values that the entities
+ * can agree on.
+ *)
+process
+  (
+      processPasswords
+    | (!processSPEKE)
+    | (!processAgreement)
+  )
