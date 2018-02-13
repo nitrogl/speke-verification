@@ -1,6 +1,9 @@
-*.out
-*.dot
-*.pdf
-*.aux
-*.toc
+# Some undesirable Linux files
+.directory
+*~
 
+# Some undesirable Windows files
+Thumbs.db
+ehthumbs.db
+ehthumbs_vista.db
+$RECYCLE.BIN/
