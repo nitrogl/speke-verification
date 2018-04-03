@@ -1,6 +1,12 @@
 # Symbolic verification of SPEKE protocols
 Verification of the design of the SPEKE protocols in many variants including the original and the latest ISO standard
 
+## Publication
+
+Further reading about this work can be found [here](https://arxiv.org/abs/1802.04900).
+
+## Basics
+
 Once you succesfully install proverif, scripts can be veified running the following:
 
 ```
