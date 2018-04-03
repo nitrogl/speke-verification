@@ -1,9 +1,10 @@
 # Symbolic verification of SPEKE protocols
 Verification of the design of the SPEKE protocols in many variants including the original and the latest ISO standard
 
-## Publication
+## Description & Discussion
 
-Further reading about this work can be found [here](https://arxiv.org/abs/1802.04900).
+At the following link you can find detailed discussion:
+- [arXiv paper](https://arxiv.org/abs/1802.04900)
 
 ## Basics
 
