@@ -8,7 +8,7 @@ At the following link you can find detailed discussion:
 
 ## Basics
 
-Once you succesfully install proverif, scripts can be veified running the following:
+Once you succesfully install proverif (1.97), scripts can be veified running the following:
 
 ```
     proverif <file>.pv
