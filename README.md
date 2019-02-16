@@ -3,8 +3,8 @@ Verification of the design of the SPEKE protocols in many variants including the
 
 ## Description & Discussion
 
-At the following link you can find detailed discussion:
-- [arXiv paper](https://arxiv.org/abs/1802.04900)
+At the following link you can find detailed discussion in the paper:
+- [Analyzing and Patching SPEKE in ISO/IEC](https://doi.org/10.1109/TIFS.2018.2832984) published at IEEE Transactions on Information Forensics and Security in 2018.
 
 ## Basics
 
